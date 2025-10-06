@@ -1,8 +1,13 @@
 document.addEventListener('DOMContentLoaded', () => {
-    // Initialize Telegram Web App
-    const tg = window.Telegram.WebApp;
-    tg.ready();
-    tg.expand();
+    // Initialize Telegram Web App with fallback
+    const tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
+    if (tg) {
+        tg.ready();
+        tg.expand();
+    } else {
+        console.warn('Telegram Web App is not available. Running in fallback mode.');
+        showNotification('warning', 'Это приложение предназначено для работы в Telegram. Некоторые функции могут быть недоступны.');
+    }
 
     // Hide loading screen after 2 seconds
     setTimeout(() => {
@@ -64,15 +69,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Telegram auth
     function initTelegramAuth() {
-        if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
+        if (tg && tg.initDataUnsafe && tg.initDataUnsafe.user) {
             handleTelegramAuth(tg.initDataUnsafe.user);
         } else {
-            showNotification('error', 'Не удалось получить данные Telegram. Попробуйте снова.');
+            showNotification('error', 'Авторизация доступна только в Telegram. Откройте приложение через @PYRLVPN_bot.');
         }
     }
 
     function handleTelegramAuth(user) {
-        fetch('/api/auth', {
+        fetch('https://your-backend-domain.com/api/auth', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(user)
@@ -104,7 +109,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Initialize auth on load if user data is available
-    if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
+    if (tg && tg.initDataUnsafe && tg.initDataUnsafe.user) {
         handleTelegramAuth(tg.initDataUnsafe.user);
     }
 
@@ -115,17 +120,19 @@ document.addEventListener('DOMContentLoaded', () => {
         
         if (!userId || userId === '---') {
             showNotification('error', 'Пожалуйста, авторизуйтесь через Telegram.');
-            tg.showPopup({
-                title: 'Авторизация',
-                message: 'Для выбора тарифа необходимо авторизоваться.',
-                buttons: [{ type: 'ok', text: 'Авторизоваться', id: 'auth' }]
-            }, (buttonId) => {
-                if (buttonId === 'auth') initTelegramAuth();
-            });
+            if (tg) {
+                tg.showPopup({
+                    title: 'Авторизация',
+                    message: 'Для выбора тарифа необходимо авторизоваться.',
+                    buttons: [{ type: 'ok', text: 'Авторизоваться', id: 'auth' }]
+                }, (buttonId) => {
+                    if (buttonId === 'auth') initTelegramAuth();
+                });
+            }
             return;
         }
         
-        fetch('/api/create_payment', {
+        fetch('https://your-backend-domain.com/api/create_payment', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ user_id: userId, plan, period })
@@ -146,7 +153,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Referral data
     function loadReferralData(userId) {
-        fetch(`/api/referral/${userId}`)
+        fetch(`https://your-backend-domain.com/api/referral/${userId}`)
             .then(response => response.json())
             .then(data => {
                 document.getElementById('referralLink').value = data.referral_link;
@@ -179,25 +186,35 @@ document.addEventListener('DOMContentLoaded', () => {
         link.select();
         document.execCommand('copy');
         showNotification('success', 'Ссылка скопирована!');
-        tg.showPopup({
-            title: 'Ссылка скопирована',
-            message: 'Реферальная ссылка успешно скопирована в буфер обмена.',
-            buttons: [{ type: 'ok' }]
-        });
+        if (tg) {
+            tg.showPopup({
+                title: 'Ссылка скопирована',
+                message: 'Реферальная ссылка успешно скопирована в буфер обмена.',
+                buttons: [{ type: 'ok' }]
+            });
+        }
     };
 
     window.shareReferralLink = function() {
         const link = document.getElementById('referralLink').value;
-        tg.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(link)}`);
+        if (tg) {
+            tg.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(link)}`);
+        } else {
+            window.open(`https://t.me/share/url?url=${encodeURIComponent(link)}`, '_blank');
+        }
     };
 
     window.openTelegramBot = function() {
-        tg.openTelegramLink('https://t.me/PYRLVPN_bot');
+        if (tg) {
+            tg.openTelegramLink('https://t.me/PYRLVPN_bot');
+        } else {
+            window.open('https://t.me/PYRLVPN_bot', '_blank');
+        }
     };
 
     // Profile data
     function loadProfileData(userId) {
-        fetch(`/api/profile/${userId}`)
+        fetch(`https://your-backend-domain.com/api/profile/${userId}`)
             .then(response => response.json())
             .then(data => {
                 document.getElementById('daysLeft').textContent = `${data.days_left} дней`;
@@ -218,11 +235,13 @@ document.addEventListener('DOMContentLoaded', () => {
         url.select();
         document.execCommand('copy');
         showNotification('success', 'Ссылка VPN скопирована!');
-        tg.showPopup({
-            title: 'Ссылка скопирована',
-            message: 'Ссылка для подключения VPN успешно скопирована.',
-            buttons: [{ type: 'ok' }]
-        });
+        if (tg) {
+            tg.showPopup({
+                title: 'Ссылка скопирована',
+                message: 'Ссылка для подключения VPN успешно скопирована.',
+                buttons: [{ type: 'ok' }]
+            });
+        }
     };
 
     window.getVpnConfig = function() {
@@ -244,4 +263,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         setTimeout(() => notification.remove(), 5000);
     }
+
+    // Bind auth button
+    document.getElementById('mainActionBtn').addEventListener('click', initTelegramAuth);
 });
