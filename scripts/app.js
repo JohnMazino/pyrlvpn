@@ -1,28 +1,38 @@
-// Инициализация Telegram Web App
-const tg = window.Telegram.WebApp;
-tg.ready();
+// Ждём полной загрузки страницы и Telegram SDK
+document.addEventListener('DOMContentLoaded', () => {
+    // Проверяем, доступен ли Telegram WebApp
+    if (window.Telegram && window.Telegram.WebApp) {
+        const tg = window.Telegram.WebApp;
+        tg.ready();
 
-// Получение данных пользователя
-const user = tg.initDataUnsafe.user;
-if (user) {
-    document.getElementById('userName').textContent = user.first_name || 'Пользователь';
-    document.getElementById('userId').textContent = `ID: ${user.id}`;
-    document.getElementById('userStatus').textContent = 'Авторизован';
-    document.getElementById('userStatus').classList.remove('status-inactive');
-    document.getElementById('userStatus').classList.add('status-active');
-    if (user.photo_url) {
-        document.getElementById('userAvatar').src = user.photo_url;
-        document.getElementById('userAvatar').style.display = 'block';
-        document.getElementById('avatarPlaceholder').style.display = 'none';
+        // Получение данных пользователя
+        const user = tg.initDataUnsafe.user;
+        if (user) {
+            document.getElementById('userName').textContent = user.first_name || 'Пользователь';
+            document.getElementById('userId').textContent = `ID: ${user.id}`;
+            document.getElementById('userStatus').textContent = 'Авторизован';
+            document.getElementById('userStatus').classList.remove('status-inactive');
+            document.getElementById('userStatus').classList.add('status-active');
+            if (user.photo_url) {
+                document.getElementById('userAvatar').src = user.photo_url;
+                document.getElementById('userAvatar').style.display = 'block';
+                document.getElementById('avatarPlaceholder').style.display = 'none';
+            }
+            // Запрос данных подписки
+            fetchSubscriptionData(user.id);
+        } else {
+            console.warn('Пользователь не авторизован в Telegram');
+            showNotification('Пожалуйста, откройте приложение в Telegram', 'error');
+        }
+    } else {
+        console.warn('Telegram WebApp SDK не загружен. Открыто вне Telegram?');
+        showNotification('Это приложение работает только в Telegram', 'error');
     }
-    // Отправка user_id боту для проверки подписки
-    fetchSubscriptionData(user.id);
-}
+});
 
-// Загрузка данных подписки
+// Функция загрузки данных подписки
 async function fetchSubscriptionData(userId) {
     try {
-        // Запрос к вашему серверу или напрямую к Marzban API
         const response = await fetch(`https://pyrlvpn.mooo.com/api/subscription?user_id=${userId}`);
         const data = await response.json();
         if (data.success && data.subscription) {
@@ -39,55 +49,7 @@ async function fetchSubscriptionData(userId) {
     }
 }
 
-// Копирование реферальной ссылки
-function copyReferralLink() {
-    const referralLink = `https://t.me/PYRLVPN_bot?start=ref_${user.id}`;
-    navigator.clipboard.writeText(referralLink).then(() => {
-        showNotification('Ссылка скопирована!', 'success');
-    });
-    document.getElementById('referralLink').value = referralLink;
-}
-
-// Копирование ссылки подписки
-function copySubscriptionUrl() {
-    const subscriptionUrl = document.getElementById('subscriptionUrl').value;
-    navigator.clipboard.writeText(subscriptionUrl).then(() => {
-        showNotification('Ссылка на подписку скопирована!', 'success');
-    });
-}
-
-// Поделиться реферальной ссылкой
-function shareReferralLink() {
-    const referralLink = `https://t.me/PYRLVPN_bot?start=ref_${user.id}`;
-    tg.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(referralLink)}&text=Присоединяйтесь к PYRL VPN!`);
-}
-
-// Выбор тарифа
-function selectPlan(plan) {
-    tg.MainButton.setText(`Оплатить тариф ${plan}`);
-    tg.MainButton.show();
-    tg.MainButton.onClick(() => {
-        // Отправка команды боту для создания платежа
-        tg.sendData(JSON.stringify({ action: 'subscribe', plan: plan }));
-    });
-}
-
-// Переключение секций
-function scrollToSection(sectionId) {
-    document.querySelectorAll('section').forEach(section => section.classList.remove('active'));
-    document.getElementById(sectionId).classList.add('active');
-    document.querySelectorAll('.nav-link').forEach(link => link.classList.remove('active'));
-    document.querySelector(`.nav-link[data-section="${sectionId}"]`).classList.add('active');
-    tg.MainButton.hide();
-}
-
-// Переключение темы
-document.getElementById('themeToggle').addEventListener('click', () => {
-    const currentTheme = document.documentElement.getAttribute('data-theme');
-    document.documentElement.setAttribute('data-theme', currentTheme === 'dark' ? 'light' : 'dark');
-});
-
-// Уведомления
+// Функция уведомлений
 function showNotification(message, type = 'info') {
     const notification = document.createElement('div');
     notification.className = `notification ${type}`;
@@ -100,16 +62,27 @@ function showNotification(message, type = 'info') {
     notification.querySelector('.notification-close').addEventListener('click', () => notification.remove());
 }
 
-// Скрытие загрузочного экрана
-setTimeout(() => {
-    document.getElementById('loadingScreen').style.opacity = '0';
-    setTimeout(() => document.getElementById('loadingScreen').remove(), 500);
-}, 2000);
-
-// Обработка сообщений от бота
-tg.onEvent('web_app_data', (data) => {
-    const message = JSON.parse(data);
-    if (message.action === 'subscription_updated') {
-        fetchSubscriptionData(user.id);
+// Другие функции (копирование ссылок, выбор тарифа и т.д.)...
+function copyReferralLink() {
+    const user = window.Telegram?.WebApp?.initDataUnsafe?.user;
+    if (user) {
+        const referralLink = `https://t.me/PYRLVPN_bot?start=ref_${user.id}`;
+        navigator.clipboard.writeText(referralLink).then(() => {
+            showNotification('Ссылка скопирована!', 'success');
+        });
+        document.getElementById('referralLink').value = referralLink;
     }
-});
+}
+
+function selectPlan(plan) {
+    if (window.Telegram && window.Telegram.WebApp) {
+        const tg = window.Telegram.WebApp;
+        tg.MainButton.setText(`Оплатить тариф ${plan}`);
+        tg.MainButton.show();
+        tg.MainButton.onClick(() => {
+            tg.sendData(JSON.stringify({ action: 'subscribe', plan: plan }));
+        });
+    } else {
+        showNotification('Откройте приложение в Telegram для оплаты', 'error');
+    }
+}
