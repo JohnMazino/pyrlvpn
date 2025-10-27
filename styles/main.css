@@ -1314,7 +1314,9 @@ section.active {
     }
 }
 
-/* Telegram Web App Compatibility */
+/* Добавьте эти стили в конец вашего CSS файла */
+
+/* Telegram Web App адаптация */
 body {
     margin-bottom: env(safe-area-inset-bottom);
     padding-bottom: env(safe-area-inset-bottom);
@@ -1322,4 +1324,158 @@ body {
 
 .header {
     padding-top: env(safe-area-inset-top);
+    background: var(--bg-primary);
+}
+
+/* Mobile Menu */
+.mobile-menu {
+    position: fixed;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: var(--bg-primary);
+    z-index: 999;
+    transition: left 0.3s ease;
+    padding-top: calc(60px + env(safe-area-inset-top));
+}
+
+.mobile-menu.active {
+    left: 0;
+}
+
+.mobile-menu-content {
+    padding: 2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.mobile-nav-link {
+    padding: 1rem;
+    color: var(--text-primary);
+    text-decoration: none;
+    font-weight: 500;
+    border-bottom: 1px solid var(--border);
+    transition: all 0.3s;
+}
+
+.mobile-nav-link.active {
+    color: var(--primary);
+    border-color: var(--primary);
+}
+
+.mobile-nav-link:hover {
+    background: var(--bg-secondary);
+    border-radius: var(--radius);
+}
+
+/* Улучшения для мобильных устройств */
+@media (max-width: 768px) {
+    .nav-links {
+        display: none;
+    }
+    
+    .menu-toggle {
+        display: flex;
+    }
+    
+    .hero .container {
+        grid-template-columns: 1fr;
+        text-align: center;
+        gap: 2rem;
+    }
+    
+    .hero-title {
+        font-size: 2.5rem;
+    }
+    
+    .pricing-cards {
+        grid-template-columns: 1fr;
+    }
+    
+    .referral-content {
+        grid-template-columns: 1fr;
+        gap: 2rem;
+    }
+    
+    .profile-actions {
+        flex-direction: column;
+    }
+    
+    .footer-content {
+        grid-template-columns: 1fr;
+        text-align: center;
+        gap: 2rem;
+    }
+}
+
+/* Notification Styles */
+.notification {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: var(--bg-card);
+    color: var(--text-primary);
+    padding: 1rem 1.5rem;
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-lg);
+    border-left: 4px solid var(--primary);
+    z-index: 10000;
+    max-width: 400px;
+    animation: slideInRight 0.3s ease-out;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.notification.success {
+    border-left-color: var(--accent);
+}
+
+.notification.error {
+    border-left-color: var(--error);
+}
+
+.notification-content {
+    flex: 1;
+}
+
+.notification-close {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 0.25rem;
+    border-radius: 4px;
+    transition: all 0.3s;
+}
+
+.notification-close:hover {
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+}
+
+@keyframes slideInRight {
+    from { transform: translateX(100%); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+}
+
+/* Улучшения для скролла */
+html {
+    scroll-behavior: smooth;
+}
+
+/* Улучшения для интерактивных элементов */
+button {
+    -webkit-tap-highlight-color: transparent;
+}
+
+/* Адаптация под темную тему Telegram */
+@media (prefers-color-scheme: dark) {
+    [data-theme="auto"] {
+        --bg-primary: #0f0f23;
+        --bg-secondary: #1a1b2e;
+        --text-primary: #ffffff;
+    }
 }
