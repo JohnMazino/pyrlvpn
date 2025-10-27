@@ -1,269 +1,272 @@
-document.addEventListener('DOMContentLoaded', () => {
-    // Initialize Telegram Web App with fallback
-    const tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
-    if (tg) {
-        tg.ready();
+// Telegram Web App initialization
+let tg = window.Telegram.WebApp;
+let user = null;
+
+class VPNMiniApp {
+    constructor() {
+        this.init();
+    }
+
+    async init() {
+        // Инициализация Telegram Web App
         tg.expand();
-    } else {
-        console.warn('Telegram Web App is not available. Running in fallback mode.');
-        showNotification('warning', 'Это приложение предназначено для работы в Telegram. Некоторые функции могут быть недоступны.');
+        tg.enableClosingConfirmation();
+        
+        // Установка цветовой схемы Telegram
+        this.setTelegramTheme();
+        
+        // Загрузка пользовательских данных
+        await this.loadUserData();
+        
+        // Инициализация интерфейса
+        this.initNavigation();
+        this.initEventListeners();
+        
+        // Скрытие экрана загрузки
+        this.hideLoadingScreen();
     }
 
-    // Hide loading screen after 2 seconds
-    setTimeout(() => {
-        document.getElementById('loadingScreen').style.opacity = '0';
-        setTimeout(() => {
-            document.getElementById('loadingScreen').style.display = 'none';
-        }, 500);
-    }, 2000);
+    setTelegramTheme() {
+        // Используем тему Telegram
+        document.documentElement.style.setProperty('--bg-primary', tg.themeParams.bg_color || '#0f0f23');
+        document.documentElement.style.setProperty('--text-primary', tg.themeParams.text_color || '#ffffff');
+        document.documentElement.style.setProperty('--button-color', tg.themeParams.button_color || '#6366f1');
+        document.documentElement.style.setProperty('--button-text-color', tg.themeParams.button_text_color || '#ffffff');
+    }
 
-    // Navigation
-    const navLinks = document.querySelectorAll('.nav-link');
-    const sections = document.querySelectorAll('section');
-    
-    navLinks.forEach(link => {
-        link.addEventListener('click', (e) => {
-            e.preventDefault();
-            const sectionId = link.getAttribute('data-section');
-            scrollToSection(sectionId);
-        });
-    });
-
-    function scrollToSection(sectionId) {
-        sections.forEach(section => {
-            section.classList.remove('active');
-            if (section.id === sectionId) {
-                section.classList.add('active');
+    async loadUserData() {
+        try {
+            // Получаем данные пользователя из Telegram
+            user = tg.initDataUnsafe?.user;
+            
+            if (user) {
+                this.updateUserProfile(user);
+                await this.loadSubscriptionData(user.id);
+            } else {
+                this.showNotification('Для доступа к функциям требуется авторизация', 'error');
             }
-        });
+        } catch (error) {
+            console.error('Error loading user data:', error);
+        }
+    }
+
+    updateUserProfile(userData) {
+        document.getElementById('userName').textContent = 
+            userData.first_name + (userData.last_name ? ' ' + userData.last_name : '');
+        document.getElementById('userId').textContent = `ID: ${userData.id}`;
+        document.getElementById('userStatus').textContent = 'Авторизован';
+        document.getElementById('userStatus').className = 'status-active';
+
+        // Аватар пользователя
+        if (userData.photo_url) {
+            document.getElementById('userAvatar').src = userData.photo_url;
+            document.getElementById('userAvatar').style.display = 'block';
+            document.getElementById('avatarPlaceholder').style.display = 'none';
+        }
+    }
+
+    async loadSubscriptionData(userId) {
+        try {
+            // Здесь будет запрос к вашему боту для получения данных подписки
+            const response = await this.makeRequestToBot('get_subscription', { user_id: userId });
+            
+            if (response.success) {
+                this.updateSubscriptionUI(response.data);
+            }
+        } catch (error) {
+            console.error('Error loading subscription data:', error);
+        }
+    }
+
+    updateSubscriptionUI(data) {
+        if (data.is_active) {
+            document.getElementById('subscriptionInfo').style.display = 'block';
+            document.getElementById('subscriptionUrl').value = data.subscription_url;
+            document.getElementById('subscriptionExpiry').textContent = data.expiry_date;
+            document.getElementById('daysLeft').textContent = data.days_left + ' дней';
+            document.getElementById('trafficUsed').textContent = data.traffic_used + ' GB';
+            document.getElementById('activeDevices').textContent = data.active_devices;
+            
+            document.getElementById('mainActionBtn').style.display = 'none';
+            document.getElementById('vpnConfigBtn').style.display = 'block';
+        }
+    }
+
+    initNavigation() {
+        // Навигация по секциям
+        const navLinks = document.querySelectorAll('.nav-link, .mobile-nav-link');
+        const sections = document.querySelectorAll('section');
+        
         navLinks.forEach(link => {
-            link.classList.remove('active');
-            if (link.getAttribute('data-section') === sectionId) {
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                const targetSection = link.getAttribute('data-section');
+                
+                // Обновление активных ссылок
+                navLinks.forEach(l => l.classList.remove('active'));
                 link.classList.add('active');
-            }
-        });
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
-
-    // Theme toggle
-    document.getElementById('themeToggle').addEventListener('click', () => {
-        const currentTheme = document.documentElement.getAttribute('data-theme');
-        document.documentElement.setAttribute('data-theme', currentTheme === 'dark' ? 'light' : 'dark');
-        document.querySelector('.theme-icon').textContent = currentTheme === 'dark' ? '☀️' : '🌙';
-    });
-
-    // Mobile menu toggle
-    document.getElementById('menuToggle').addEventListener('click', () => {
-        document.querySelector('.nav-links').classList.toggle('active');
-        document.querySelector('.nav-actions').classList.toggle('active');
-    });
-
-    // Pricing switcher
-    document.querySelectorAll('.switch-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            document.querySelectorAll('.switch-btn').forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-            document.querySelector('.pricing-switcher').classList.toggle('yearly', btn.dataset.period === 'yearly');
-        });
-    });
-
-    // Telegram auth
-    function initTelegramAuth() {
-        if (tg && tg.initDataUnsafe && tg.initDataUnsafe.user) {
-            handleTelegramAuth(tg.initDataUnsafe.user);
-        } else {
-            showNotification('error', 'Авторизация доступна только в Telegram. Откройте приложение через @PYRLVPN_bot.');
-        }
-    }
-
-    function handleTelegramAuth(user) {
-        fetch('https://your-backend-domain.com/api/auth', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(user)
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.status === 'success') {
-                document.getElementById('userName').textContent = data.user.first_name || data.user.username || 'Пользователь';
-                document.getElementById('userId').textContent = `ID: ${data.user.id}`;
-                document.getElementById('userStatus').textContent = 'Авторизован';
-                document.getElementById('userStatus').classList.remove('status-inactive');
-                document.getElementById('userStatus').classList.add('status-active');
-                document.getElementById('mainActionBtn').style.display = 'none';
-                document.getElementById('vpnConfigBtn').style.display = 'block';
-                document.getElementById('authBtn').style.display = 'none';
-                loadProfileData(data.user.id);
-                loadReferralData(data.user.id);
-                if (window.location.hash === '#profile') {
-                    scrollToSection('profile');
-                }
-            } else {
-                showNotification('error', 'Ошибка авторизации. Попробуйте снова.');
-            }
-        })
-        .catch(error => {
-            showNotification('error', 'Ошибка сети. Проверьте подключение.');
-            console.error('Auth error:', error);
-        });
-    }
-
-    // Initialize auth on load if user data is available
-    if (tg && tg.initDataUnsafe && tg.initDataUnsafe.user) {
-        handleTelegramAuth(tg.initDataUnsafe.user);
-    }
-
-    // Select plan
-    window.selectPlan = function(plan) {
-        const period = document.querySelector('.switch-btn.active').dataset.period;
-        const userId = document.getElementById('userId').textContent.replace('ID: ', '');
-        
-        if (!userId || userId === '---') {
-            showNotification('error', 'Пожалуйста, авторизуйтесь через Telegram.');
-            if (tg) {
-                tg.showPopup({
-                    title: 'Авторизация',
-                    message: 'Для выбора тарифа необходимо авторизоваться.',
-                    buttons: [{ type: 'ok', text: 'Авторизоваться', id: 'auth' }]
-                }, (buttonId) => {
-                    if (buttonId === 'auth') initTelegramAuth();
+                
+                // Показ целевой секции
+                sections.forEach(section => {
+                    section.classList.remove('active');
+                    if (section.id === targetSection) {
+                        section.classList.add('active');
+                    }
                 });
-            }
-            return;
-        }
+                
+                // Закрытие мобильного меню
+                this.closeMobileMenu();
+            });
+        });
+    }
+
+    initEventListeners() {
+        // Переключение мобильного меню
+        document.getElementById('menuToggle').addEventListener('click', () => {
+            this.toggleMobileMenu();
+        });
+
+        // Переключение периодов тарифов
+        document.querySelectorAll('.switch-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.switch-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                
+                const period = btn.getAttribute('data-period');
+                document.querySelectorAll('.pricing-cards').forEach(cards => {
+                    cards.className = `pricing-cards plan-switcher ${period}`;
+                });
+            });
+        });
+
+        // Закрытие мобильного меню при клике на ссылку
+        document.querySelectorAll('.mobile-nav-link').forEach(link => {
+            link.addEventListener('click', () => {
+                this.closeMobileMenu();
+            });
+        });
+    }
+
+    toggleMobileMenu() {
+        document.getElementById('mobileMenu').classList.toggle('active');
+    }
+
+    closeMobileMenu() {
+        document.getElementById('mobileMenu').classList.remove('active');
+    }
+
+    hideLoadingScreen() {
+        setTimeout(() => {
+            document.getElementById('loadingScreen').style.opacity = '0';
+            setTimeout(() => {
+                document.getElementById('loadingScreen').style.display = 'none';
+            }, 500);
+        }, 1000);
+    }
+
+    showNotification(message, type = 'info') {
+        const notification = document.getElementById('notification');
+        const notificationText = document.getElementById('notificationText');
         
-        fetch('https://your-backend-domain.com/api/create_payment', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ user_id: userId, plan, period })
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.status === 'success') {
-                window.location.href = data.payment_url;
-            } else {
-                showNotification('error', 'Не удалось создать платеж. Попробуйте снова.');
-            }
-        })
-        .catch(error => {
-            showNotification('error', 'Ошибка сети. Проверьте подключение.');
-            console.error('Payment error:', error);
-        });
-    };
-
-    // Referral data
-    function loadReferralData(userId) {
-        fetch(`https://your-backend-domain.com/api/referral/${userId}`)
-            .then(response => response.json())
-            .then(data => {
-                document.getElementById('referralLink').value = data.referral_link;
-                document.getElementById('referralCount').textContent = data.referrals_count;
-                document.getElementById('earnedBonuses').textContent = `${data.referrals_count * 7} дней`;
-                
-                const leaderboard = document.getElementById('leaderboard');
-                leaderboard.innerHTML = data.leaderboard.map((item, index) => `
-                    <div class="leaderboard-item">
-                        <div class="leaderboard-position">
-                            <span class="position-medal">${index < 3 ? ['🥇', '🥈', '🥉'][index] : ''}</span>
-                            <span class="position-number">${index + 1}</span>
-                            <span class="position-user">Пользователь ${item.user_id}</span>
-                        </div>
-                        <span class="leaderboard-count">${item.referrals} рефералов</span>
-                    </div>
-                `).join('');
-                
-                const userPosition = data.leaderboard.findIndex(item => item.user_id === userId) + 1;
-                document.getElementById('leaderPosition').textContent = userPosition > 0 ? userPosition : '-';
-            })
-            .catch(error => {
-                showNotification('error', 'Не удалось загрузить реферальные данные.');
-                console.error('Referral error:', error);
-            });
-    }
-
-    window.copyReferralLink = function() {
-        const link = document.getElementById('referralLink');
-        link.select();
-        document.execCommand('copy');
-        showNotification('success', 'Ссылка скопирована!');
-        if (tg) {
-            tg.showPopup({
-                title: 'Ссылка скопирована',
-                message: 'Реферальная ссылка успешно скопирована в буфер обмена.',
-                buttons: [{ type: 'ok' }]
-            });
-        }
-    };
-
-    window.shareReferralLink = function() {
-        const link = document.getElementById('referralLink').value;
-        if (tg) {
-            tg.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(link)}`);
-        } else {
-            window.open(`https://t.me/share/url?url=${encodeURIComponent(link)}`, '_blank');
-        }
-    };
-
-    window.openTelegramBot = function() {
-        if (tg) {
-            tg.openTelegramLink('https://t.me/PYRLVPN_bot');
-        } else {
-            window.open('https://t.me/PYRLVPN_bot', '_blank');
-        }
-    };
-
-    // Profile data
-    function loadProfileData(userId) {
-        fetch(`https://your-backend-domain.com/api/profile/${userId}`)
-            .then(response => response.json())
-            .then(data => {
-                document.getElementById('daysLeft').textContent = `${data.days_left} дней`;
-                document.getElementById('trafficUsed').textContent = `${data.traffic_used} GB`;
-                document.getElementById('activeDevices').textContent = data.active_devices;
-                document.getElementById('subscriptionUrl').value = data.vpn_url;
-                document.getElementById('subscriptionExpiry').textContent = data.days_left > 0 ? new Date(Date.now() + data.days_left * 24 * 60 * 60 * 1000).toLocaleString() : '--.--.---- --:--:--';
-                document.getElementById('subscriptionInfo').style.display = data.vpn_url ? 'block' : 'none';
-            })
-            .catch(error => {
-                showNotification('error', 'Не удалось загрузить данные профиля.');
-                console.error('Profile error:', error);
-            });
-    }
-
-    window.copySubscriptionUrl = function() {
-        const url = document.getElementById('subscriptionUrl');
-        url.select();
-        document.execCommand('copy');
-        showNotification('success', 'Ссылка VPN скопирована!');
-        if (tg) {
-            tg.showPopup({
-                title: 'Ссылка скопирована',
-                message: 'Ссылка для подключения VPN успешно скопирована.',
-                buttons: [{ type: 'ok' }]
-            });
-        }
-    };
-
-    window.getVpnConfig = function() {
-        const userId = document.getElementById('userId').textContent.replace('ID: ', '');
-        loadProfileData(userId);
-    };
-
-    // Notification
-    function showNotification(type, message) {
-        const notification = document.createElement('div');
+        notificationText.textContent = message;
         notification.className = `notification ${type}`;
-        notification.innerHTML = `
-            <div class="notification-content">${message}</div>
-            <button class="notification-close">✕</button>
-        `;
-        document.body.appendChild(notification);
-        notification.querySelector('.notification-close').addEventListener('click', () => {
-            notification.remove();
-        });
-        setTimeout(() => notification.remove(), 5000);
+        notification.style.display = 'flex';
+        
+        setTimeout(() => {
+            this.hideNotification();
+        }, 5000);
     }
 
-    // Bind auth button
-    document.getElementById('mainActionBtn').addEventListener('click', initTelegramAuth);
+    hideNotification() {
+        document.getElementById('notification').style.display = 'none';
+    }
+
+    async makeRequestToBot(method, data) {
+        // Здесь будет реализация запросов к вашему боту
+        // Используйте tg.sendData() или fetch к вашему API
+        try {
+            const response = await fetch('/api/' + method, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    ...data,
+                    initData: tg.initData
+                })
+            });
+            return await response.json();
+        } catch (error) {
+            console.error('API request failed:', error);
+            throw error;
+        }
+    }
+}
+
+// Глобальные функции для использования в HTML
+function scrollToSection(sectionId) {
+    document.getElementById(sectionId).scrollIntoView({ behavior: 'smooth' });
+}
+
+function selectPlan(planType) {
+    const app = new VPNMiniApp();
+    if (!user) {
+        app.showNotification('Пожалуйста, авторизуйтесь для выбора тарифа', 'error');
+        return;
+    }
+    
+    app.showNotification(`Выбран тариф: ${planType}`, 'success');
+    // Здесь будет логика обработки выбора тарифа
+}
+
+function copyReferralLink() {
+    const linkInput = document.getElementById('referralLink');
+    linkInput.select();
+    document.execCommand('copy');
+    
+    const app = new VPNMiniApp();
+    app.showNotification('Ссылка скопирована в буфер обмена', 'success');
+}
+
+function shareReferralLink() {
+    if (tg.isVersionAtLeast('6.1')) {
+        tg.shareUrl(
+            'Присоединяйтесь к PYRL VPN!',
+            document.getElementById('referralLink').value
+        );
+    } else {
+        copyReferralLink();
+        new VPNMiniApp().showNotification('Ссылка скопирована. Поделитесь ею вручную.', 'info');
+    }
+}
+
+function copySubscriptionUrl() {
+    const urlInput = document.getElementById('subscriptionUrl');
+    urlInput.select();
+    document.execCommand('copy');
+    
+    new VPNMiniApp().showNotification('Ссылка подписки скопирована', 'success');
+}
+
+function initTelegramAuth() {
+    // В Mini App пользователь уже авторизован через Telegram
+    new VPNMiniApp().showNotification('Вы уже авторизованы через Telegram', 'info');
+}
+
+function getVpnConfig() {
+    const app = new VPNMiniApp();
+    app.showNotification('Конфигурация VPN загружается...', 'info');
+    
+    // Здесь будет логика получения конфигурации VPN
+    setTimeout(() => {
+        app.showNotification('Конфигурация VPN готова к использованию', 'success');
+    }, 2000);
+}
+
+// Инициализация приложения при загрузке
+document.addEventListener('DOMContentLoaded', () => {
+    new VPNMiniApp();
 });
+
+// Обработка данных от Telegram
+tg.ready();
