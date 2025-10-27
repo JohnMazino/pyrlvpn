@@ -26,6 +26,10 @@
     
     --radius: 12px;
     --radius-lg: 16px;
+    --tg-theme-bg-color: var(--bg-primary);
+    --tg-theme-text-color: var(--text-primary);
+    --tg-theme-button-color: var(--primary);
+    --tg-theme-button-text-color: white;
 }
 
 [data-theme="light"] {
@@ -53,6 +57,7 @@ body {
     background: var(--bg-primary);
     transition: all 0.3s ease;
     overflow-x: hidden;
+    margin-bottom: calc(env(safe-area-inset-bottom) + 60px);
 }
 
 .container {
